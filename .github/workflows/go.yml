@@ -78,12 +78,6 @@ jobs:
       run: |
         mv build_assets Tuny-${{ env.ASSET_NAME }}
     
-    - name: Upload files to Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: Tuny-${{ env.ASSET_NAME }}
-        path: |
-          ./Tuny-${{ env.ASSET_NAME }}/*
 
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
