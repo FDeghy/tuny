@@ -78,8 +78,6 @@ func (c Connections) Get(i int) *qConnection {
 }
 
 func (c *Connections) Delete(i int) {
-	connMutex.Lock()
-	defer connMutex.Unlock()
 	heap.Remove(c, i)
 }
 
