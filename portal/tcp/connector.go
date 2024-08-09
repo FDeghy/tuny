@@ -22,16 +22,6 @@ func StartTcpConnector(
 	engine.OnData(onNewData)
 
 	engine.OnClose(onClose)
-	// engine.OnClose(func(c *nbio.Conn, err error) {
-	// 	mutexDial.RLock()
-	// 	key, _ := c.Session().(string)
-	// 	sess, ok := dialTable[key]
-	// 	mutexDial.RUnlock()
-	// 	if !ok {
-	// 		sess = &session{}
-	// 	}
-	// 	closeStrConn(sess, c, key)
-	// })
 
 	err := engine.Start()
 	if err != nil {
@@ -43,41 +33,3 @@ func StartTcpConnector(
 
 	return engine, nil
 }
-
-// func onNewStream() func(c *nbio.Conn, data []byte) {
-// 	return func(c *nbio.Conn, data []byte) {
-// 		mutexDial.RLock()
-// 		key, _ := c.Session().(string)
-// 		sess, ok := dialTable[key]
-// 		mutexDial.RUnlock()
-// 		if !ok {
-// 			log.Printf("dialTable sess not found\n")
-// 			c.Close()
-// 			closeStrConn(sess, c, key)
-// 			return
-// 		}
-
-// 		i := 0
-// 		for ; i < 10; i++ {
-// 			mutexDial.RLock()
-// 			sess = dialTable[key]
-// 			mutexDial.RUnlock()
-// 			if sess.dStream != nil {
-// 				break
-// 			}
-// 			log.Printf("wait 1s for dStream\n")
-// 			time.Sleep(time.Second)
-// 		}
-// 		if i == 10 {
-// 			log.Printf("dStream not found\n")
-// 			closeStrConn(sess, c, key)
-// 			return
-// 		}
-// 		_, err := sess.dStream.Write(data)
-// 		if err != nil {
-// 			log.Printf("error write to dStream: %v\n", err)
-// 			closeStrConn(sess, c, key)
-// 			return
-// 		}
-// 	}
-// }

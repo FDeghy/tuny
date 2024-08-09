@@ -1,9 +1,9 @@
 package transport
 
 import (
+	"container/heap"
 	"context"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -16,9 +16,9 @@ import (
 // IRAN
 
 var (
-	iranConnections = make([]qConnection, 0, 64)
-	mutex           = &sync.RWMutex{}
-	iranNewConn     = make(chan qConnection, 4)
+	iranConnectionsUpload   = &Connections{}
+	iranConnectionsDownload = &Connections{}
+	iranNewConn             = make(chan *qConnection, 16)
 )
 
 func StartIran(localTunnelAddr string, quicConf *quic.Config) error {
@@ -61,9 +61,16 @@ func StartIran(localTunnelAddr string, quicConf *quic.Config) error {
 	go handleConnections()
 
 	// create manage stream
-	_, err = newManageStream()
-	if err != nil {
-		return fmt.Errorf("newManageStream %w", err)
+	for {
+		err = newManageStream()
+		if err != nil {
+			logger.Warn().
+				Err(err).
+				Msg("waiting for connection")
+			time.Sleep(5 * time.Second)
+		} else {
+			break
+		}
 	}
 
 	return nil
@@ -82,175 +89,125 @@ func acceptConnenction(ln *quic.Listener) {
 		log.Info().
 			Msgf("new quic conn accept: %v", conn.RemoteAddr())
 
-		iranNewConn <- qConnection{
+		iranNewConn <- &qConnection{
 			Type:       UNKNOWN,
 			Conn:       conn,
 			RemoteAddr: conn.RemoteAddr(),
+			mutex:      &sync.RWMutex{},
 		}
 	}
-}
-
-func haveManageConn() bool {
-	mutex.RLock()
-	defer mutex.RUnlock()
-	for _, c := range iranConnections {
-		if c.Type == CREATE_MANAGE {
-			return true
-		}
-	}
-	return false
 }
 
 func handleConnections() {
-	var conn qConnection
+	var conn *qConnection
+
 	i := 0
 	for {
 		conn = <-iranNewConn
 
-		if !haveManageConn() {
-			conn.Type = CREATE_MANAGE
-			mutex.Lock()
-			iranConnections = append(iranConnections, conn)
-			mutex.Unlock()
-			continue
-		}
-
 		if i == 0 {
 			conn.Type = IRAN_TO_KHAREJ_CONN
-			mutex.Lock()
-			iranConnections = append(iranConnections, conn)
+			heap.Push(iranConnectionsUpload, conn)
 			log.Debug().
-				Int("len of iranConnections", len(iranConnections)).
+				Int("len of iranConnectionsUpload", iranConnectionsUpload.Len()).
 				Msg("new iran to kharej connction")
-			mutex.Unlock()
 			i = 1
 		} else if i == 1 {
 			conn.Type = KHAREJ_TO_IRAN_CONN
-			mutex.Lock()
-			iranConnections = append(iranConnections, conn)
+			heap.Push(iranConnectionsDownload, conn)
 			log.Debug().
-				Int("len of iranConnections", len(iranConnections)).
+				Int("len of iranConnectionsDownload", iranConnectionsDownload.Len()).
 				Msg("new kharej to iran connction")
-			mutex.Unlock()
 			i = 0
 		}
 	}
 }
 
-func GetStream(stype ConnType) (quic.Stream, error) {
-	_, err := waitActiveConn()
+func GetStream(stype ConnType) (*Stream, error) {
+	var conn *qConnection
+
+	for i := 0; i < 5; i++ {
+		if stype == IRAN_TO_KHAREJ_CONN {
+			conn = iranConnectionsUpload.Get(0)
+		} else if stype == KHAREJ_TO_IRAN_CONN {
+			conn = iranConnectionsDownload.Get(0)
+		}
+
+		if conn != nil {
+			break
+		} else {
+			requestNewConnection()
+		}
+	}
+
+	if conn == nil {
+		return nil, fmt.Errorf("cannot get connection from pool")
+	}
+
+	if conn.GetNumStream() == int(quicConfig.MaxIncomingStreams/2) {
+		requestNewConnection()
+	}
+
+	stream, err := conn.Conn.OpenStream()
 	if err != nil {
-		return nil, fmt.Errorf("waitActiveConn %w", err)
+		return nil, fmt.Errorf("OpenStream error: %w", err)
 	}
 
-	mutex.RLock()
-	mStream := manageStream
-	mutex.RUnlock()
-	if mStream == nil {
-		mStream, err = newManageStream()
-		if err != nil {
-			return nil, fmt.Errorf("newManageStream %w", err)
-		}
-	}
-
-	mutex.RLock()
-	defer mutex.RUnlock()
-	for i, c := range iranConnections {
-		if i == int(math.Max(0, float64(len(iranConnections)-4))) { // allways have 2 idle connection
-			requestNewConnection(mStream)
-		}
-		if c.Type != stype {
-			continue
-		}
-		stream, err := c.Conn.OpenStream()
-		if err != nil {
-			logger.Warn().
-				Err(err).
-				Msg("OpenStream error")
-			continue
-		}
-		stream.Write([]byte{byte(stype)})
-		logger.Info().
-			Uint8("type", byte(stype)).
-			Int64("stream id", int64(stream.StreamID())).
-			Msg("stream created")
-		return stream, nil
-	}
-
-	return nil, fmt.Errorf("no connection available")
-}
-
-func waitActiveConn() (qConnection, error) {
-	for {
-		mutex.RLock()
-		lenIrConn := len(iranConnections)
-		mutex.RUnlock()
-
-		if lenIrConn > 0 {
-			mutex.RLock()
-			defer mutex.RUnlock()
-			return iranConnections[0], nil
-		}
-		log.Debug().
-			Msg("wait 3s to get connection")
-		time.Sleep(3 * time.Second)
-	}
-	//return qConnection{}, fmt.Errorf("timeout")
-}
-
-func newManageStream() (quic.Stream, error) {
-	var stream quic.Stream
-
-	_, err := waitActiveConn()
+	_, err = stream.Write([]byte{byte(stype)})
 	if err != nil {
-		return nil, fmt.Errorf("waitActiveConn %w", err)
+		return nil, fmt.Errorf("write stream type error: %w", err)
 	}
 
-	mutex.Lock()
-	for i, c := range iranConnections {
-		if c.Type != UNKNOWN && c.Type != CREATE_MANAGE {
-			continue
-		}
-		stream, err = c.Conn.OpenStream()
-		if err != nil {
-			stream = nil
-			logger.Warn().
-				Err(err).
-				Msg("newManageStream open error")
-			logger.Info().
-				Msg("wait 1s to get newManageStream")
-			time.Sleep(1000 * time.Millisecond)
-			continue
-		}
-		_, err = stream.Write([]byte{byte(CREATE_MANAGE)})
-		if err != nil {
-			stream = nil
-			logger.Warn().
-				Err(err).
-				Msg("newManageStream write error")
-			logger.Info().
-				Msg("wait 1s to get newManageStream\n")
-			time.Sleep(1000 * time.Millisecond)
-			continue
-		}
-		if manageStream != nil {
-			manageStream.Close()
-		}
-		manageStream = stream
-		c.Type = CREATE_MANAGE
-		iranConnections[i] = c
-		break
+	conn.AddStream(1)
+	if stype == IRAN_TO_KHAREJ_CONN {
+		iranConnectionsUpload.Update(conn)
+	} else if stype == KHAREJ_TO_IRAN_CONN {
+		iranConnectionsDownload.Update(conn)
 	}
-	mutex.Unlock()
-	if stream == nil {
-		return nil, fmt.Errorf("cannot find manager connection to create mStream")
-	}
-	return stream, nil
+
+	logger.Info().
+		Uint8("type", byte(stype)).
+		Int64("stream id", int64(stream.StreamID())).
+		Msg("stream created")
+
+	return &Stream{
+		Stream: stream,
+		conn:   conn,
+	}, nil
 }
 
-func requestNewConnection(stream quic.Stream) {
+func newManageStream() error {
+	qc := iranConnectionsUpload.Get(0)
+	if qc == nil {
+		return fmt.Errorf("cannot get a connection")
+	}
+
+	stream, err := qc.Conn.OpenStream()
+	if err != nil {
+		return fmt.Errorf("OpenStream error: %w", err)
+	}
+	_, err = stream.Write([]byte{byte(CREATE_MANAGE)})
+	if err != nil {
+		return fmt.Errorf("stream Write error: %w", err)
+	}
+
+	if manageStream != nil {
+		manageStream.Close()
+	}
+	manageStream = &Stream{
+		Stream: stream,
+		conn:   qc,
+	}
+
+	qc.AddStream(1)
+	iranConnectionsUpload.Update(qc)
+
+	return nil
+}
+
+func requestNewConnection() {
 	for {
-		_, err := stream.Write([]byte{byte(CREATE_BICONN)})
+		_, err := manageStream.Stream.Write([]byte{byte(CREATE_BICONN)})
 		if err != nil {
 			newManageStream()
 			continue

@@ -71,7 +71,9 @@ func handleStream(dstAddr string, engine *nbio.Engine) func(transport.ConnType, 
 				sess = &tunnel{}
 			}
 			sess.conn = c
-			sess.uStream = stream
+			sess.uStream = &transport.Stream{
+				Stream: stream,
+			}
 			c.SetSession(addrPort.String())
 			dialTable[addrPort.String()] = sess
 			mutexDial.Unlock()
@@ -107,7 +109,9 @@ func handleStream(dstAddr string, engine *nbio.Engine) func(transport.ConnType, 
 			if !ok {
 				sess = &tunnel{}
 			}
-			sess.dStream = stream
+			sess.dStream = &transport.Stream{
+				Stream: stream,
+			}
 			dialTable[addrPort.String()] = sess
 			mutexDial.Unlock()
 		}
@@ -166,7 +170,7 @@ func fonNewData(c *nbio.Conn, data []byte) {
 		return
 	}
 
-	_, err := sess.dStream.Write(data)
+	_, err := sess.dStream.Stream.Write(data)
 
 	if err != nil {
 		logger.Warn().

@@ -1,9 +1,8 @@
 package core
 
 import (
-	"io"
+	"Tuny/transport"
 	"net"
-	"time"
 )
 
 type Config struct {
@@ -12,15 +11,10 @@ type Config struct {
 	DestAddr   string
 }
 
-type stream interface {
-	io.ReadWriteCloser
-	SetReadDeadline(t time.Time) error
-}
-
 type tunnel struct {
 	conn    net.Conn
-	uStream stream
-	dStream stream
+	uStream *transport.Stream
+	dStream *transport.Stream
 }
 
 func (t tunnel) close() {

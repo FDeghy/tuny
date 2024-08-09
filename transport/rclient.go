@@ -22,15 +22,15 @@ func StartKharej(rTunAddr, localAddr string, quicConf *quic.Config, hStream func
 	remoteTunnelAddr = rTunAddr
 	handleStream = hStream
 
-	dial, err := createConnection(localAddr) // manage connection
-	if err != nil {
-		return fmt.Errorf("createConnection %w", err)
-	}
-	//defer dial.CloseWithError(0, "bye")
+	// dial, err := createConnection(localAddr) // manage connection
+	// if err != nil {
+	// 	return fmt.Errorf("createConnection %w", err)
+	// }
+	// //defer dial.CloseWithError(0, "bye")
 
-	go acceptStream(dial)
+	// go acceptStream(dial)
 
-	err = createTunnelConnection()
+	err := createTunnelConnection()
 	if err != nil {
 		return fmt.Errorf("createTunnelConnection %w", err)
 	}
@@ -104,38 +104,25 @@ func onNewStream(stream quic.Stream) {
 			Int64("stream id", int64(stream.StreamID())).
 			Msg("new manager stream")
 
-		//mutex.Lock()
-		//manageStream = stream
 		go handleManageStream(stream)
-		//mutex.Unlock()
+
 	case IRAN_TO_KHAREJ_CONN:
 		logger.Info().
 			Int64("stream id", int64(stream.StreamID())).
 			Msg("new IRAN_TO_KHAREJ_CONN stream")
 
-		// qc := qConnection{
-		// 	Type: IRAN_TO_KHAREJ_CONN,
-		// 	Conn: conn,
-		// }
-		//mutex.Lock()
-		//connections[qc] = append(connections[qc], stream)
 		go handleStream(IRAN_TO_KHAREJ_CONN, stream)
-		//mutex.Unlock()
+
 	case KHAREJ_TO_IRAN_CONN:
 		logger.Info().
 			Int64("stream id", int64(stream.StreamID())).
 			Msg("new KHAREJ_TO_IRAN_CONN stream")
-		// qc := qConnection{
-		// 	Type: KHAREJ_TO_IRAN_CONN,
-		// 	Conn: conn,
-		// }
-		//mutex.Lock()
-		//connections[qc] = append(connections[qc], stream)
+
 		go handleStream(KHAREJ_TO_IRAN_CONN, stream)
-		//mutex.Unlock()
+
 	default:
 		logger.Warn().
-			Bytes("data", buff[:1]).
+			Bytes("data", buff).
 			Msg("stream byte[0] is not valid")
 	}
 }

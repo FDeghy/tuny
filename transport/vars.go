@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	internalDomain             = "seyed.dev"
-	manageStream   quic.Stream = nil
+	internalDomain         = "seyed.dev"
+	manageStream   *Stream = nil
 	quicConfig     *quic.Config
 	logger         zerolog.Logger
 )

@@ -63,10 +63,10 @@ func lonNewConn(c *nbio.Conn) {
 
 	addr, _ := netip.ParseAddrPort(c.RemoteAddr().String())
 	addrBytes, _ := addr.MarshalBinary()
-	dStream.Write(addrBytes)
-	uStream.Write(addrBytes)
+	dStream.Stream.Write(addrBytes)
+	uStream.Stream.Write(addrBytes)
 
-	dStream.SetReadDeadline(time.Now().Add(MaxIdleConnection))
+	dStream.Stream.SetReadDeadline(time.Now().Add(MaxIdleConnection))
 	c.SetReadDeadline(time.Now().Add(MaxIdleConnection))
 	go t.handleDownStream()
 }
@@ -74,7 +74,7 @@ func lonNewConn(c *nbio.Conn) {
 // user -> tunnel
 func lonNewData(c *nbio.Conn, data []byte) {
 	t := c.Session().(*tunnel)
-	_, err := t.uStream.Write(data)
+	_, err := t.uStream.Stream.Write(data)
 	if err != nil {
 		logger.Info().
 			Err(err).
@@ -90,7 +90,7 @@ func (t *tunnel) handleDownStream() {
 	buff := tools.GetBuffer()
 	defer tools.PutBuffer(buff)
 	for {
-		n, err := t.dStream.Read(buff)
+		n, err := t.dStream.Stream.Read(buff)
 		if err != nil {
 			logger.Info().
 				Err(err).
@@ -106,7 +106,7 @@ func (t *tunnel) handleDownStream() {
 			t.close()
 			return
 		}
-		t.dStream.SetReadDeadline(time.Now().Add(MaxIdleConnection))
+		t.dStream.Stream.SetReadDeadline(time.Now().Add(MaxIdleConnection))
 	}
 }
 
