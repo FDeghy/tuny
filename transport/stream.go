@@ -18,7 +18,7 @@ func (s Stream) Close() {
 	} else if s.conn.Type == KHAREJ_TO_IRAN_CONN {
 		iranConnectionsDownload.Update(s.conn)
 	}
-	if s.conn.GetNumStream() == 0 {
+	if s.conn.GetNumStream() == 0 && iranConnectionsDownload.Len() > 4 && iranConnectionsUpload.Len() > 4 {
 		s.conn.Conn.CloseWithError(0, "no stream")
 		if s.conn.Type == IRAN_TO_KHAREJ_CONN {
 			iranConnectionsUpload.Delete(s.conn.index)

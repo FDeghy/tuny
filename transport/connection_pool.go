@@ -65,8 +65,6 @@ func (c *Connections) Pop() any {
 }
 
 func (c *Connections) Update(qc *qConnection) {
-	connMutex.Lock()
-	defer connMutex.Unlock()
 	heap.Fix(c, qc.index)
 }
 

@@ -67,12 +67,11 @@ func StartIran(localTunnelAddr string, quicConf *quic.Config) error {
 			logger.Warn().
 				Err(err).
 				Msg("waiting for connection")
-			time.Sleep(5 * time.Second)
 		} else {
 			break
 		}
+		time.Sleep(1 * time.Second)
 	}
-
 	return nil
 }
 
@@ -125,6 +124,10 @@ func handleConnections() {
 
 func GetStream(stype ConnType) (*Stream, error) {
 	var conn *qConnection
+
+	if iranConnectionsDownload.Len() <= 4 || iranConnectionsUpload.Len() <= 4 {
+		requestNewConnection()
+	}
 
 	for i := 0; i < 5; i++ {
 		if stype == IRAN_TO_KHAREJ_CONN {
