@@ -32,6 +32,7 @@ jobs:
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
       GOARM: ${{ matrix.goarm }}
+      CGO_ENABLED: 0
       
     steps:
     - uses: actions/checkout@v4
