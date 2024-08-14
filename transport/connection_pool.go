@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"github.com/quic-go/quic-go"
 )
@@ -17,7 +18,7 @@ type qConnection struct {
 	Type       ConnType
 	Conn       quic.Connection
 	RemoteAddr net.Addr
-	NumStreams int
+	NumStreams atomic.Int32
 	mutex      *sync.RWMutex
 }
 
@@ -32,7 +33,7 @@ func (c Connections) Len() int {
 func (c Connections) Less(i, j int) bool {
 	connMutex.RLock()
 	defer connMutex.RUnlock()
-	return c[i].NumStreams < c[j].NumStreams
+	return c[i].NumStreams.Load() < c[j].NumStreams.Load()
 }
 
 func (c Connections) Swap(i, j int) {
@@ -84,17 +85,17 @@ func (c *Connections) Delete(i int) {
 func (qc *qConnection) AddStream(i int) {
 	qc.mutex.Lock()
 	defer qc.mutex.Unlock()
-	qc.NumStreams += i
+	qc.NumStreams.Add(int32(i))
 }
 
 func (qc *qConnection) DecStream(i int) {
 	qc.mutex.Lock()
 	defer qc.mutex.Unlock()
-	qc.NumStreams -= i
+	qc.NumStreams.Add(int32(-i))
 }
 
 func (qc *qConnection) GetNumStream() int {
 	qc.mutex.RLock()
 	defer qc.mutex.RUnlock()
-	return qc.NumStreams
+	return int(qc.NumStreams.Load())
 }

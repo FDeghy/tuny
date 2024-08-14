@@ -1,25 +1,29 @@
 package transport
 
 import (
+	"sync/atomic"
+
 	"github.com/quic-go/quic-go"
 )
 
 type Stream struct {
 	Stream quic.Stream
 	conn   *qConnection
-	closed bool
+	closed atomic.Bool
 }
 
 func (s *Stream) Close() {
+	s.Stream.CancelRead(0)
+	s.Stream.CancelWrite(0)
 	err := s.Stream.Close()
-	if err != nil || s.closed {
+	if err != nil || s.closed.Load() {
 		return
 	}
 	if s.conn == nil { // kharej
 		return
 	}
 
-	s.closed = true
+	s.closed.Store(true)
 	s.conn.DecStream(1)
 	if s.conn.Type == IRAN_TO_KHAREJ_CONN {
 		iranConnectionsUpload.Update(s.conn)
