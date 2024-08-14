@@ -20,15 +20,16 @@ type quicConn struct {
 	conn *net.UDPConn
 }
 
-func NewQuicConn(IpPort string) (*quicConn, error) {
+func NewQuicConn(IpPort string) (*net.UDPConn, error) {
 	addr, err := net.ResolveUDPAddr("udp", IpPort)
 	if err != nil {
 		return nil, err
 	}
 	conn, err := net.ListenUDP("udp", addr)
-	return &quicConn{
-		conn: conn,
-	}, err
+	return conn, err
+	// return &quicConn{
+	// 	conn: conn,
+	// }, err
 }
 
 func (c *quicConn) ReadFrom(b []byte) (int, net.Addr, error) {
