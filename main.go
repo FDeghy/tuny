@@ -14,6 +14,7 @@ func main() {
 	lAddr := flag.String("la", "", "local address")
 	tAddr := flag.String("ta", "", "tunnel address")
 	dAddr := flag.String("da", "", "destination address")
+	proto := flag.Int("p", 17, "ip protocol number")
 	flag.Parse()
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
@@ -23,6 +24,7 @@ func main() {
 		err := core.StartListener(core.Config{
 			LocalAddr:  *lAddr,
 			TunnelAddr: *tAddr,
+			Proto:      *proto,
 		})
 		if err != nil {
 			log.Fatalln(err)
@@ -32,6 +34,7 @@ func main() {
 			LocalAddr:  *lAddr,
 			TunnelAddr: *tAddr,
 			DestAddr:   *dAddr,
+			Proto:      *proto,
 		})
 		if err != nil {
 			log.Fatalln(err)

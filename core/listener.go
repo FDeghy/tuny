@@ -23,7 +23,7 @@ func StartListener(c Config) error {
 		c.TunnelAddr = "0.0.0.0:4433"
 	}
 
-	err := transport.StartIran(c.TunnelAddr, quicConf)
+	err := transport.StartIran(c.TunnelAddr, c.Proto, quicConf)
 	if err != nil {
 		return err
 	}

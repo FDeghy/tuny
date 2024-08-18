@@ -9,6 +9,7 @@ type Config struct {
 	TunnelAddr string
 	LocalAddr  string
 	DestAddr   string
+	Proto      int
 }
 
 type tunnel struct {

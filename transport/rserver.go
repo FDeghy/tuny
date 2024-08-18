@@ -21,14 +21,14 @@ var (
 	iranNewConn             = make(chan *qConnection, 16)
 )
 
-func StartIran(localTunnelAddr string, quicConf *quic.Config) error {
+func StartIran(localTunnelAddr string, proto int, quicConf *quic.Config) error {
 	quicConfig = quicConf
 
 	logger = log.With().
 		Str("loc", "Iran Quic").
 		Logger()
 
-	conn, err := NewQuicConn(localTunnelAddr)
+	conn, err := NewQuicConn(localTunnelAddr, proto)
 	if err != nil {
 		return fmt.Errorf("transport.NewQuicConn: %w", err)
 	}
@@ -56,6 +56,11 @@ func StartIran(localTunnelAddr string, quicConf *quic.Config) error {
 	if err != nil {
 		return fmt.Errorf("tr.Listen: %w", err)
 	}
+
+	log.Debug().
+		Str("address", conn.LocalAddr().String()).
+		Str("network", conn.LocalAddr().Network()).
+		Msg("start listening")
 
 	go acceptConnenction(ln)
 	go handleConnections()

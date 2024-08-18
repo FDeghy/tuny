@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/quic-go/quic-go"
+	"github.com/rs/zerolog/log"
 	xtls "github.com/xtls/xray-core/transport/internet/tls"
 )
 
@@ -15,12 +16,14 @@ import (
 var (
 	remoteTunnelAddr string
 	handleStream     func(ConnType, quic.Stream)
+	proto            int
 )
 
-func StartKharej(rTunAddr, localAddr string, quicConf *quic.Config, hStream func(ConnType, quic.Stream)) error {
+func StartKharej(rTunAddr, localAddr string, ippr int, quicConf *quic.Config, hStream func(ConnType, quic.Stream)) error {
 	quicConfig = quicConf
 	remoteTunnelAddr = rTunAddr
 	handleStream = hStream
+	proto = ippr
 
 	// dial, err := createConnection(localAddr) // manage connection
 	// if err != nil {
@@ -38,8 +41,8 @@ func StartKharej(rTunAddr, localAddr string, quicConf *quic.Config, hStream func
 	return nil
 }
 
-func createConnection(localAddr string) (quic.Connection, error) {
-	conn, err := NewQuicConn(localAddr)
+func createConnection(localAddr string, proto int) (quic.Connection, error) {
+	conn, err := NewQuicConn(localAddr, proto)
 	if err != nil {
 		return nil, fmt.Errorf("transport.NewQuicConn: %w", err)
 	}
@@ -48,7 +51,9 @@ func createConnection(localAddr string) (quic.Connection, error) {
 		ConnectionIDLength: 12,
 		Conn:               conn,
 	}
-	addr, _ := net.ResolveUDPAddr("udp", remoteTunnelAddr)
+	//addr, _ := net.ResolveUDPAddr("udp", remoteTunnelAddr)
+	addr, err := net.ResolveIPAddr(fmt.Sprintf("ip:%v", proto), remoteTunnelAddr)
+	log.Printf("addr: %+v, err: %v", addr, err)
 	tlsConfig := &xtls.Config{
 		ServerName:    internalDomain,
 		AllowInsecure: true,
@@ -152,7 +157,7 @@ func handleManageStream(stream quic.Stream) {
 
 func createTunnelConnection() error {
 	// dial two connection
-	conn1, err := createConnection("0.0.0.0:0")
+	conn1, err := createConnection("0.0.0.0", proto)
 	if err != nil {
 		return fmt.Errorf("createTunnelConnection: %w", err)
 	}
@@ -162,7 +167,7 @@ func createTunnelConnection() error {
 
 	go acceptStream(conn1)
 
-	conn2, err := createConnection("0.0.0.0:0")
+	conn2, err := createConnection("0.0.0.0", proto)
 	if err != nil {
 		return fmt.Errorf("createTunnelConnection: %w", err)
 	}

@@ -33,7 +33,7 @@ func StartForwarder(c Config) error {
 	if err != nil {
 		return err
 	}
-	err = transport.StartKharej(c.TunnelAddr, c.LocalAddr, quicConf, handleStream(c.DestAddr, engine))
+	err = transport.StartKharej(c.TunnelAddr, c.LocalAddr, c.Proto, quicConf, handleStream(c.DestAddr, engine))
 	if err != nil {
 		return err
 	}
