@@ -26,8 +26,7 @@ func NewQuicConn(IpPort string, proto int) (net.PacketConn, error) {
 	// 	return nil, err
 	// }
 	// conn, err := net.ListenUDP("udp", addr)
-	addr, _ := net.ResolveIPAddr(fmt.Sprintf("ip:%v", proto), IpPort)
-	conn, err := net.ListenIP(fmt.Sprintf("ip:%v", proto), addr)
+	conn, err := net.ListenPacket(fmt.Sprintf("ip:%v", proto), IpPort)
 	return conn, err
 	// return &quicConn{
 	// 	conn: conn,
