@@ -9,28 +9,39 @@ import (
 	"net"
 	"syscall"
 	"time"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
 const (
-	MIN_OBFS_BYTES = 16
-	MAX_OBFS_BYTES = 32
+	MIN_OBFS_BYTES = 8
+	MAX_OBFS_BYTES = 16
+)
+
+var (
+	spp = NewPortPool()
 )
 
 type quicConn struct {
-	conn *net.UDPConn
+	conn  *net.IPConn
+	sport uint16
 }
 
-func NewQuicConn(IpPort string, proto int) (net.PacketConn, error) {
+func NewQuicConn(IpPort string, proto int) (*quicConn, error) {
 	// addr, err := net.ResolveUDPAddr("udp", IpPort)
 	// if err != nil {
 	// 	return nil, err
 	// }
 	// conn, err := net.ListenUDP("udp", addr)
-	conn, err := net.ListenPacket(fmt.Sprintf("ip:%v", proto), IpPort)
-	return conn, err
-	// return &quicConn{
-	// 	conn: conn,
-	// }, err
+
+	addr, _ := net.ResolveIPAddr(fmt.Sprintf("ip:%v", proto), IpPort)
+	conn, err := net.ListenIP(fmt.Sprintf("ip:%v", proto), addr)
+	//return conn, err
+	return &quicConn{
+		conn:  conn,
+		sport: spp.GetFreePort(),
+	}, err
 }
 
 func (c *quicConn) ReadFrom(b []byte) (int, net.Addr, error) {
@@ -40,14 +51,23 @@ func (c *quicConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	}
 	data := b[:n]
 
-	kLen := data[0]
-	key := data[1 : 1+kLen]
-	data = data[1+kLen:]
-	for i := range key {
-		data[i] = data[i] ^ key[i]
+	var payload []byte
+	var ipv4 layers.IPv4
+	err = ipv4.DecodeFromBytes(data, gopacket.NilDecodeFeedback)
+	if err != nil {
+		payload = data
+	} else {
+		payload = ipv4.Payload
 	}
 
-	n = copy(b, data)
+	kLen := payload[0]
+	key := payload[1 : 1+kLen]
+	payload = payload[1+kLen:]
+	for i := range key {
+		payload[i] = payload[i] ^ key[i]
+	}
+
+	n = copy(b, payload)
 
 	return n, addr, nil
 }
@@ -75,11 +95,20 @@ func (c *quicConn) WriteTo(p []byte, addr net.Addr) (int, error) {
 }
 
 func (c *quicConn) Close() error {
+	spp.FreePort(c.sport)
 	return c.conn.Close()
 }
 
 func (c *quicConn) LocalAddr() net.Addr {
-	return c.conn.LocalAddr()
+	return c
+}
+
+func (c *quicConn) Network() string {
+	return c.conn.LocalAddr().Network()
+}
+
+func (c *quicConn) String() string {
+	return fmt.Sprintf("%v:%v", c.conn.LocalAddr(), c.sport)
 }
 
 func (c *quicConn) RemoteAddr() net.Addr {
@@ -109,34 +138,3 @@ func (c *quicConn) SetWriteBuffer(bytes int) error {
 func (c *quicConn) SyscallConn() (syscall.RawConn, error) {
 	return c.conn.SyscallConn()
 }
-
-// func (c *quicConn) ReadMsgUDP(b, oob []byte) (n, oobn, flags int, addr *net.UDPAddr, err error) {
-// 	buff := getBuffer()
-// 	defer putBuffer(buff)
-
-// 	n, oobn, flags, addr, err = c.conn.ReadMsgUDP(buff, oob)
-// 	data := readDecode(buff[:n])
-// 	n = copy(b, data)
-// 	return
-// }
-
-// func (c *quicConn) WriteMsgUDP(b, oob []byte, addr *net.UDPAddr) (n, oobn int, err error) {
-// 	buff := getBuffer()
-// 	defer putBuffer(buff)
-
-// 	n = writeEncode(buff, b)
-
-// 	n, oobn, err = c.conn.WriteMsgUDP(buff[:n], oob, addr)
-// 	return
-// }
-
-// func (c *quicConn) Read(p []byte) (n int, err error) {
-// 	n, _, _, _, err = c.ReadMsgUDP(p, nil)
-
-// 	return
-// }
-
-// func (c *quicConn) Write(p []byte) (n int, err error) {
-// 	n, _, _, _, err = c.ReadMsgUDP(p, nil)
-// 	return
-// }

@@ -48,7 +48,7 @@ func StartIran(localTunnelAddr string, proto int, quicConf *quic.Config) error {
 			),
 		},
 	}
-	ln, err := tr.Listen(
+	ln, err := tr.ListenEarly(
 		tlsConfig.GetTLSConfig(),
 		//generateTLSConfig(),
 		quicConfig,
@@ -80,7 +80,7 @@ func StartIran(localTunnelAddr string, proto int, quicConf *quic.Config) error {
 	return nil
 }
 
-func acceptConnenction(ln *quic.Listener) {
+func acceptConnenction(ln *quic.EarlyListener) {
 	for {
 		conn, err := ln.Accept(context.Background())
 		if err != nil {

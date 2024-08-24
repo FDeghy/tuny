@@ -51,14 +51,14 @@ func createConnection(localAddr string, proto int) (quic.Connection, error) {
 		ConnectionIDLength: 12,
 		Conn:               conn,
 	}
-	//addr, _ := net.ResolveUDPAddr("udp", remoteTunnelAddr)
+	//addr, err := net.ResolveUDPAddr("udp", remoteTunnelAddr)
 	addr, err := net.ResolveIPAddr(fmt.Sprintf("ip:%v", proto), remoteTunnelAddr)
-	log.Printf("addr: %+v, err: %v", addr, err)
+	log.Printf("addr: %+v, proto: %v, err: %v", addr, fmt.Sprintf("ip:%v", proto), err)
 	tlsConfig := &xtls.Config{
 		ServerName:    internalDomain,
 		AllowInsecure: true,
 	}
-	dial, err := tr.Dial(
+	dial, err := tr.DialEarly(
 		context.Background(),
 		addr,
 		tlsConfig.GetTLSConfig(),
@@ -157,9 +157,9 @@ func handleManageStream(stream quic.Stream) {
 
 func createTunnelConnection() error {
 	// dial two connection
-	conn1, err := createConnection("0.0.0.0", proto)
+	conn1, err := createConnection("0.0.0.0:0", proto)
 	if err != nil {
-		return fmt.Errorf("createTunnelConnection: %w", err)
+		return err
 	}
 	logger.Debug().
 		Str("local address", conn1.LocalAddr().String()).
@@ -167,9 +167,9 @@ func createTunnelConnection() error {
 
 	go acceptStream(conn1)
 
-	conn2, err := createConnection("0.0.0.0", proto)
+	conn2, err := createConnection("0.0.0.0:0", proto)
 	if err != nil {
-		return fmt.Errorf("createTunnelConnection: %w", err)
+		return err
 	}
 	logger.Debug().
 		Str("local address", conn2.LocalAddr().String()).
