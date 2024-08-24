@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	MIN_OBFS_BYTES = 8
-	MAX_OBFS_BYTES = 16
+	MIN_OBFS_BYTES = 0
+	MAX_OBFS_BYTES = 8
 )
 
 var (
@@ -26,9 +26,10 @@ var (
 type quicConn struct {
 	conn  *net.IPConn
 	sport uint16
+	mode  int
 }
 
-func NewQuicConn(IpPort string, proto int) (*quicConn, error) {
+func NewQuicConn(IpPort string, proto, mode int) (*quicConn, error) {
 	// addr, err := net.ResolveUDPAddr("udp", IpPort)
 	// if err != nil {
 	// 	return nil, err
@@ -41,6 +42,7 @@ func NewQuicConn(IpPort string, proto int) (*quicConn, error) {
 	return &quicConn{
 		conn:  conn,
 		sport: spp.GetFreePort(),
+		mode:  mode,
 	}, err
 }
 
@@ -54,7 +56,7 @@ func (c *quicConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	var payload []byte
 	var ipv4 layers.IPv4
 	err = ipv4.DecodeFromBytes(data, gopacket.NilDecodeFeedback)
-	if err != nil {
+	if err != nil || c.mode == 0 {
 		payload = data
 	} else {
 		payload = ipv4.Payload
@@ -82,6 +84,9 @@ func (c *quicConn) WriteTo(p []byte, addr net.Addr) (int, error) {
 
 	maxKeyLength := int(math.Min(float64(MAX_OBFS_BYTES), float64(len(p))))
 	kLen := mRand.Intn(maxKeyLength-MIN_OBFS_BYTES) + MIN_OBFS_BYTES
+	if len(p) < MIN_OBFS_BYTES {
+		kLen = len(p)
+	}
 
 	buff[0] = byte(kLen)
 	rand.Read(buff[1 : 1+kLen])

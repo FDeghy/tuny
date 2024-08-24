@@ -42,7 +42,7 @@ func StartKharej(rTunAddr, localAddr string, ippr int, quicConf *quic.Config, hS
 }
 
 func createConnection(localAddr string, proto int) (quic.Connection, error) {
-	conn, err := NewQuicConn(localAddr, proto)
+	conn, err := NewQuicConn(localAddr, proto, 1)
 	if err != nil {
 		return nil, fmt.Errorf("transport.NewQuicConn: %w", err)
 	}
