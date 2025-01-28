@@ -29,21 +29,21 @@ type quicConn struct {
 	mode  int
 }
 
-func NewQuicConn(IpPort string, proto, mode int) (*quicConn, error) {
-	// addr, err := net.ResolveUDPAddr("udp", IpPort)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// conn, err := net.ListenUDP("udp", addr)
+func NewQuicConn(IpPort string, proto, mode int) (*net.UDPConn, error) {
+	addr, err := net.ResolveUDPAddr("udp", IpPort)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := net.ListenUDP("udp", addr)
 
-	addr, _ := net.ResolveIPAddr(fmt.Sprintf("ip:%v", proto), IpPort)
-	conn, err := net.ListenIP(fmt.Sprintf("ip:%v", proto), addr)
-	//return conn, err
-	return &quicConn{
-		conn:  conn,
-		sport: spp.GetFreePort(),
-		mode:  mode,
-	}, err
+	// addr, _ := net.ResolveIPAddr(fmt.Sprintf("ip:%v", proto), IpPort)
+	// conn, err := net.ListenIP(fmt.Sprintf("ip:%v", proto), addr)
+	return conn, err
+	// return &quicConn{
+	// 	conn:  conn,
+	// 	sport: spp.GetFreePort(),
+	// 	mode:  mode,
+	// }, err
 }
 
 func (c *quicConn) ReadFrom(b []byte) (int, net.Addr, error) {
